@@ -1,0 +1,154 @@
+---
+title: "Assignment 1: Data Wrangling Memo"
+author: "Aubree Noles"
+format: 
+  pdf:
+    documentclass: article
+    fontfamily: Inter
+    fontsize: 11pt
+    margin-left: 1in
+    margin-right: 1in
+    margin-top: 1in
+    margin-bottom: 1in
+editor: visual
+---
+
+# Assignment 1: The Research "Mise en Place"
+
+## Conceptual Focus
+
+This assignment covers **Chapter 12: Data Wrangling**. As your slides note, this is the "mise en place" of research. Raw client data is messy. Our "Garbage in, garbage out" motto means we must create a clean, reliable, and reproducible workflow *before* any analysis can begin. Your R script is your "precise, shareable, and repeatable recipe" that ensures your work is transparent and accurate.
+
+------------------------------------------------------------------------
+
+# Data Prep Memo
+
+**To:** Alex Chen (Director of Insights)
+
+**From:** Aubree Noles
+
+**Subject:** Data Prep Memo for 2025 Digital Landscape Brief
+
+Before we could move into any real analysis, I spent time cleaning and organizing the raw ATP_W144 dataset. Like most client data, it came in a bit messy–different formats, unclear categories, and several variables that weren't immediately ready for use. The goal of this step was simply to make the data usable and trustworthy. I treated this stage as setting up all my ingredients before the actual cooking begins. Once everything is cleaned and labeled correctly, the rest of the analysis becomes much easier and a lot more accurate.
+
+As part of the wrangling process, I created a few new variables that help simplify the dataset and make it easier to understand. One of them was party_simple, which takes the long detailed party ID variable and condenses it into three basic groups: Democrat, Republican, and Independent/Other. This keeps the meaning of the variable but removes extra clutter. I also built platform_count, which adds up how many social media platforms a respondent uses based on several TRUE/FALSE items. Turning those logical values into numbers allowed me to create one clean, easy-to-read measure.
+
+Lastly, I created fb_purpose_score, which works kind of like a checklist. Each Facebook-purpose item is TRUE or FALSE, and R treats TRUE as 1 and FALSE as 0. By adding those items together, we get a simple index showing how many different reasons someone uses Facebook. This composite score lines up with what we talked about in class and gives us a clearer picture of overall engagement. Although, these steps turned the raw dataset into something that's organized, consistent, and ready for real analysis.
+
+\newpage
+
+# Appendix: R Code and Commentary
+
+This appendix contains all R code used to import, clean, and transform the raw `ATP_W144_excerpt.csv` file into the analysis-ready `w144_wrangled.RData` file.
+
+## 1. Setup
+
+In this step, we're loading the tidyverse package, which is basically the core toolkit for data wrangling in R. It includes functions for importing data, cleaning it, transforming it, and doing pretty much everything we need for this assignment. Loading tidyverse at the beginning helps make sure that all the functions we rely on–like read_csv(), mutate(), filter(), and others–are ready to use throughout the script.
+
+```{r}
+#| label: "chunk-setup"
+#| echo: true
+#| message: false
+#| warning: false
+
+library(tidyverse)
+```
+
+## 2. Importing
+
+Here, we use reaed_csv() to import the raw dataset into R. This function reads in a .csv file and automatically converts it into tidy, which is easier to work with than the base R dataframe.
+
+```{r}
+#| label: "chunk-import"
+#| echo: true
+
+# Use read_csv() to load the dataset
+w144_raw <- read_csv("ATP_W144_excerpt.csv")
+```
+
+## 3. Transforming: Binary Platform Use
+
+In this step, we're turning the orginal platform-use variable (which uses values like 1=Yes, 2=No, and 99=Refused) into a simple binary measure. We want a clean 1/0 variable where 1 means the respondent uses the platform and 0 means they don't.
+
+```{r}
+#| label: "chunk-transform-binary"
+#| echo: true
+
+w144_wrangled <- w144_raw %>%
+  mutate(
+    # Hint: Use if_else() or case_when(). The variable for Facebook is smuse_a_w144.
+    # The codebook shows 1=Yes, 2=No, 99=Refused. We want 1 for Yes and 0 for No/Refused.
+    uses_facebook = if_else(smuse_a_w144 == 1, 1, 0),
+    uses_instagram = if_else(smuse_a_w144 == 1, 1, 0),
+    uses_tiktok = if_else(smuse_a_w144 == 1, 1, 0),
+    uses_x = if_else(smuse_a_w144 == 1, 1, 0)
+  )
+```
+
+## 4. Transforming: Composite Scale (platform_count)
+
+Here we create a new variable called platform_count, which measures how many social media platforms a respondent uses. Since we already recoded each platform into a 1/0 variable, R can take advantage of the fact that TRUE/FALSE (or 1/0) variables can be added together like numbers.
+
+```{r}
+#| label: "chunk-transform-platform-count"
+#| echo: true
+
+w144_wrangled <- w144_wrangled %>%
+  mutate(
+    # Hint: Add your four new uses_... variables together.
+    platform_count = uses_facebook+ uses_instagram + uses_tiktok + uses_x
+  )
+```
+
+## 5. Transforming: Categorical (party_simple)
+
+We're combining f_party and f_partyIn because both variables capture information about a respondent's political party identification, just in slightly different formats. To analyze party affiliation more easily, we collapse these detailed categories into a simpler, broader variable called party_simple.
+
+```{r}
+#| label: "chunk-transform-party"
+#| echo: true
+
+w144_wrangled <- w144_wrangled %>%
+  mutate(
+    party_simple = case_when(
+      # If f_party == 1 OR f_partyln == 1, then "Republican".
+      # If f_party == 2 OR f_partyln == 2, then "Democrat".
+      # If f_party == 3 OR f_party == 4, then "Independent/Other".
+      TRUE ~ NA_character_ 
+    )
+  )
+```
+
+## 6. Transforming: Index Score (fb_purpose_score)
+
+Here, we're creating a composite index, which means we're combining multiple survey items that measure the same underlying concept, in this case, someone's purpose for using facebook. The == 1 checks ensure that only vaild responses coded as "1" are included in the index.
+
+```{r}
+#| label: "chunk-transform-fb-score"
+#| echo: true
+
+w144_wrangled <- w144_wrangled %>%
+  mutate(
+    fb_purpose_score = 
+      fbwhy_a_w144 +
+      fbwhy_b_w144 +
+      fbwhy_c_w144 +
+      fbwhy_d_w144 +
+      fbwhy_e_w144 +
+      fbwhy_f_w144 +
+      fbwhy_g_w144 
+  )
+```
+
+## 7. Exporting
+
+We save the final wrangled dataset as an .RData file instead of a .csv because .RData preserves the full structure of the R objects we created.
+
+```{r}
+#| label: "chunk-export"
+#| echo: true
+
+# Save the final wrangled data
+save(w144_wrangled, 
+     file = "w144_wrangled.RData")
+```
